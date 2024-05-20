@@ -1,0 +1,33 @@
+version: '3.9'
+
+volumes:
+  redis_data:
+
+networks:
+  backend:
+
+services:
+
+  tg_bot:
+    build: .
+    container_name: telegram_quiz_bot
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    volumes:
+      - ./app/errors.txt:/home/myuser/app/errors.txt:rw
+    user: myuser
+    restart: always
+    networks:
+      - backend
+
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    restart: always
+
