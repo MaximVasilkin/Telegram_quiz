@@ -4,13 +4,16 @@ from os import path
 PSYCHOTYPES_IMG_FOLDER = 'images'
 
 PSYCHOTYPES = {'kinesthetic': {'rus': 'кинестетик',
-                               'image': path.join(PSYCHOTYPES_IMG_FOLDER, 'kinesthetic.png')},
+                               'image': path.join(PSYCHOTYPES_IMG_FOLDER, 'kinesthetic.png'),
+                               'description': 'Описание кинестетика'},
 
                'visual': {'rus': 'визуал',
-                          'image': path.join(PSYCHOTYPES_IMG_FOLDER, 'visual.png')},
+                          'image': path.join(PSYCHOTYPES_IMG_FOLDER, 'visual.png'),
+                          'description': 'Описание визуала'},
 
                'audial': {'rus': 'аудиал',
-                          'image': path.join(PSYCHOTYPES_IMG_FOLDER, 'audial.png')}}
+                          'image': path.join(PSYCHOTYPES_IMG_FOLDER, 'audial.png'),
+                          'description': 'Описание аудиала'}}
 
 PSYCHOTYPES_NAMES = tuple(PSYCHOTYPES.keys())
 

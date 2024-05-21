@@ -1,14 +1,15 @@
 import asyncio
 import logging
 import random
-from aiogram import Router, Bot, F
+from aiogram import html, Router, Bot, F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ErrorEvent, User, CallbackQuery, FSInputFile
+from keyboards import get_start_button
 from quiz import KINESTHETIC, VISUAL, AUDIAL, QUIZ_LEN, PSYCHOTYPES
 from states import QuizStates
-from utils import get_question_content, collect_answer
+from utils import collect_answer, replace_old_question
 from redis import Redis
 
 
@@ -39,9 +40,29 @@ async def command_start_handler(message: Message, state: FSMContext, bot: Bot) -
     await state.set_data({'scores': scores})
     await state.set_state(QuizStates.quiz_in_progress)
 
-    question, keyboard = get_question_content(0)
-    sent_message = await message.answer(question, reply_markup=keyboard)
+    start_message = f'{html.bold(html.quote(message.from_user.first_name))}, приветствуем вас!\n' \
+                    f'Рады, что вы зарегистрировались на наш вебинар ' \
+                    f'{html.italic("Психология в ландшафтном дизайне")}.\n' \
+                    f'Совсем скоро вы узнаете как создавать среду, которая меняет людей.\n' \
+                    f'🌿А теперь предлагаем вам пройти небольшой тест, ' \
+                    f'в результате которого вы не только узнаете свой психотип, ' \
+                    f'но и получите визуализацию подходящего вам пространства. \n' \
+                    f'Начинаем?'
+
+    keyboard = get_start_button('Конечно!')
+
+    sent_message = await message.answer(start_message, reply_markup=keyboard)
+
     await state.update_data(previous_message_id=sent_message.message_id)
+
+
+@router.callback_query(F.data == 'start', StateFilter(QuizStates.quiz_in_progress))
+async def start_quiz(callback: CallbackQuery,
+                     state: FSMContext) -> None:
+
+    user_data = await state.get_data()
+    previous_message_id = user_data.get('previous_message_id')
+    await replace_old_question(callback.message, 0, previous_message_id)
 
 
 @router.callback_query(F.data, StateFilter(QuizStates.quiz_in_progress))
@@ -72,12 +93,20 @@ async def answering(callback: CallbackQuery,
         users_psychotype_eng = random.choice(tuple(filter(lambda x: x[1] == max_score, scores)))[0]
         users_psychotype = PSYCHOTYPES[users_psychotype_eng]
         psychotype_rus = users_psychotype['rus']
-        p_s_ = '<tg-spoiler>А тут спряталась наша к Вам любовь ❤️🤗☺️</tg-spoiler>'
-        result = f'Вы <b>{psychotype_rus.upper()}</b> \n\n' \
-                 f'Результаты: \n\n' \
-                 f'{scored_psychotypes}\n\n' \
-                 f'Пройти заново: /start\n\n' \
-                 f'{p_s_}'
+        psychotype_description = users_psychotype['description']
+
+        p_s_ = html.italic(('О том, как создать идеальный подходящий сад не только для себя, '
+                            'но и для клиента, мы расскажем на нашем вебинаре, '
+                            'посвященном психологии в ландшафтном дизайне. До встречи 4 июня! \n'
+                            'С любовью, \n'
+                            'Garden Group🍀'))
+
+        result = '\n\n'.join((f'Вы {html.bold(psychotype_rus.upper())}',
+                              f'{psychotype_description}',
+                              f'Результаты:',
+                              f'{scored_psychotypes}',
+                              f'Пройти заново: /start',
+                              f'{p_s_}'))
 
         await bot.delete_message(callback.message.chat.id, previous_message_id)
         await asyncio.sleep(0.33)
@@ -104,8 +133,7 @@ async def answering(callback: CallbackQuery,
         await state.set_state(state=None)
         return
 
-    question, keyboard = get_question_content(next_question_index)
-    await bot.edit_message_text(question, callback.message.chat.id, previous_message_id, reply_markup=keyboard)
+    await replace_old_question(callback.message, next_question_index, previous_message_id)
     await state.update_data(current_question_position=next_question_index)
 
 
