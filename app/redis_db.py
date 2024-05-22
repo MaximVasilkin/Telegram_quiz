@@ -1,4 +1,4 @@
-from redis import Redis
+import redis.asyncio as redis
 from os import getenv
 
 
@@ -7,4 +7,4 @@ from os import getenv
 #                     db=int(getenv('REDIS_CACHE_DB')),
 #                     decode_responses=True)
 
-redis_cache = Redis.from_url(getenv('REDIS_CACHE_DSN'), decode_responses=True)
+redis_client = redis.Redis.from_url(getenv('REDIS_CACHE_DSN'), decode_responses=True)

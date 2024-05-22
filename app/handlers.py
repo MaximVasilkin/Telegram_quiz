@@ -10,7 +10,7 @@ from keyboards import get_start_button
 from quiz import KINESTHETIC, VISUAL, AUDIAL, QUIZ_LEN, PSYCHOTYPES
 from states import QuizStates
 from utils import collect_answer, replace_old_question
-from redis import Redis
+import redis.asyncio as async_redis
 
 
 router = Router()
@@ -69,7 +69,7 @@ async def start_quiz(callback: CallbackQuery,
 async def answering(callback: CallbackQuery,
                     state: FSMContext,
                     bot: Bot,
-                    redis_cache: Redis) -> None:
+                    redis_client: async_redis.Redis) -> None:
 
     answer = callback.data
     await collect_answer(answer, state)
@@ -112,7 +112,7 @@ async def answering(callback: CallbackQuery,
         await bot.delete_message(callback.message.chat.id, previous_message_id)
         await asyncio.sleep(0.33)
 
-        cached_photo_id = redis_cache.get(users_psychotype_eng)
+        cached_photo_id = await redis_client.get(users_psychotype_eng)
 
         if cached_photo_id is None:
             # Отправка файла из файловой системы
@@ -124,7 +124,7 @@ async def answering(callback: CallbackQuery,
                                                 caption=result)
 
             widest_photo_id = max(sent_message.photo, key=lambda f: f.width).file_id
-            redis_cache.set(users_psychotype_eng, widest_photo_id)
+            await redis_client.set(users_psychotype_eng, widest_photo_id)
         else:
             sent_message = await bot.send_photo(chat_id=chat_id,
                                                 photo=cached_photo_id,

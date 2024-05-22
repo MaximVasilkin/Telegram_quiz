@@ -7,7 +7,8 @@ from aiogram.fsm.storage.memory import SimpleEventIsolation
 from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.utils.callback_answer import CallbackAnswerMiddleware
 from handlers import router
-from redis_db import redis_cache
+from redis_db import redis_client
+from middlewares import ThrottlingMessagesMiddleware
 
 
 async def start_bot() -> None:
@@ -25,12 +26,20 @@ async def start_bot() -> None:
 
     dp = Dispatcher(events_isolation=SimpleEventIsolation(),
                     storage=redis_fsm,
-                    redis_cache=redis_cache)
+                    redis_client=redis_client)
 
     dp.callback_query.middleware(CallbackAnswerMiddleware())
+    dp.message.middleware(ThrottlingMessagesMiddleware(redis_client))
     dp.include_routers(router)
 
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    except Exception as err:
+        logging.error(f'{err}', exc_info=True)
+    finally:
+        await bot.session.close()
+        await dp.storage.close()
+        await redis_client.aclose()
 
 
 if __name__ == '__main__':
