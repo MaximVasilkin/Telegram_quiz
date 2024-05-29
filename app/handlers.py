@@ -83,7 +83,7 @@ async def answering(callback: CallbackQuery,
         scores = sorted(user_data['scores'].items(), key=lambda x: x[1], reverse=True)
         max_scored_psychotype, max_score = scores[0]
 
-        scored_psychotypes = '\n'.join(f'{PSYCHOTYPES[psychotype]["rus"].title()} - {(score * 100) // QUIZ_LEN}%'
+        scored_psychotypes = '\n'.join(f'{PSYCHOTYPES[psychotype]["garden"].title()} - {(score * 100) // QUIZ_LEN}%'
                                        for psychotype, score in scores)
 
         users_psychotype_eng = random.choice(tuple(filter(lambda x: x[1] == max_score, scores)))[0]
@@ -100,7 +100,7 @@ async def answering(callback: CallbackQuery,
 
         result = (f'{html.italic(html.bold(f"Ваш сад - {psychotype_garden}"))}'
                   f'{psychotype_description}\n\n'
-                  f'Результаты:\n\n'
+                  f'{html.underline("Результаты:")} \n\n'
                   f'{scored_psychotypes}\n\n'
                   f'Пройти заново: /start\n\n'
                   f'{p_s_}')
