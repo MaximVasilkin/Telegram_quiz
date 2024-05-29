@@ -12,7 +12,6 @@ from states import QuizStates
 from utils import collect_answer, replace_old_question
 import redis.asyncio as async_redis
 
-
 router = Router()
 logger = logging.getLogger()
 
@@ -44,9 +43,8 @@ async def command_start_handler(message: Message, state: FSMContext, bot: Bot) -
                     f'Рады, что вы зарегистрировались на наш вебинар ' \
                     f'{html.italic("Психология в ландшафтном дизайне")}.\n' \
                     f'Совсем скоро вы узнаете как создавать среду, которая меняет людей.\n\n' \
-                    f'🌿А теперь предлагаем вам пройти небольшой тест, ' \
-                    f'в результате которого вы не только узнаете свой психотип, ' \
-                    f'но и получите визуализацию подходящего вам пространства. \n' \
+                    f'🌿А теперь мы предлагаем пройти вам небольшой тест по психологии ландшафтного дизайна. ' \
+                    f'Узнайте какой сад подойдет именно вам и получите визуализацию соответствующего пространства! \n' \
                     f'Начинаем?'
 
     keyboard = get_start_button('Конечно!')
@@ -59,7 +57,6 @@ async def command_start_handler(message: Message, state: FSMContext, bot: Bot) -
 @router.callback_query(F.data == 'start', StateFilter(QuizStates.quiz_in_progress))
 async def start_quiz(callback: CallbackQuery,
                      state: FSMContext) -> None:
-
     user_data = await state.get_data()
     previous_message_id = user_data.get('previous_message_id')
     await replace_old_question(callback.message, 0, previous_message_id)
@@ -70,7 +67,6 @@ async def answering(callback: CallbackQuery,
                     state: FSMContext,
                     bot: Bot,
                     redis_client: async_redis.Redis) -> None:
-
     answer = callback.data
     await collect_answer(answer, state)
 
@@ -92,7 +88,7 @@ async def answering(callback: CallbackQuery,
 
         users_psychotype_eng = random.choice(tuple(filter(lambda x: x[1] == max_score, scores)))[0]
         users_psychotype = PSYCHOTYPES[users_psychotype_eng]
-        psychotype_rus = users_psychotype['rus']
+        psychotype_garden = users_psychotype['garden']
         psychotype_description = users_psychotype['description']
 
         p_s_ = html.italic(('О том, как создать идеальный подходящий сад не только для себя, '
@@ -102,12 +98,12 @@ async def answering(callback: CallbackQuery,
                             'С любовью, \n'
                             f'{html.bold("Garden Group")}🍀'))
 
-        result = '\n\n'.join((f'Вы {html.bold(psychotype_rus.upper())}',
-                              f'{psychotype_description}',
-                              f'Результаты:',
-                              f'{scored_psychotypes}',
-                              f'Пройти заново: /start',
-                              f'{p_s_}'))
+        result = (f'{html.italic(html.bold(f"Ваш сад - {psychotype_garden}"))}'
+                  f'{psychotype_description}\n\n'
+                  f'Результаты:\n\n'
+                  f'{scored_psychotypes}\n\n'
+                  f'Пройти заново: /start\n\n'
+                  f'{p_s_}')
 
         await bot.delete_message(callback.message.chat.id, previous_message_id)
         await asyncio.sleep(0.33)
