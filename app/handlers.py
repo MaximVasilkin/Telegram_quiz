@@ -6,7 +6,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ErrorEvent, User, CallbackQuery, FSInputFile
-from keyboards import get_start_button
+from keyboards import get_start_button, get_url_button
 from quiz import KINESTHETIC, VISUAL, AUDIAL, QUIZ_LEN, PSYCHOTYPES
 from states import QuizStates
 from utils import collect_answer, replace_old_question
@@ -124,9 +124,11 @@ async def answering(callback: CallbackQuery,
             widest_photo_id = max(sent_message.photo, key=lambda f: f.width).file_id
             await redis_client.set(users_psychotype_eng, widest_photo_id)
         else:
+            url_button = get_url_button('Зарегистрироваться', link)
             sent_message = await bot.send_photo(chat_id=chat_id,
                                                 photo=cached_photo_id,
-                                                caption=result)
+                                                caption=result,
+                                                reply_markup=url_button)
 
         await state.update_data(previous_message_id=sent_message.message_id)
         await state.set_state(state=None)
