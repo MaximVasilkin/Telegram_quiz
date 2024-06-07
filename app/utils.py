@@ -1,4 +1,8 @@
+import asyncio
+from contextlib import suppress
+
 from aiogram import html, types
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -38,3 +42,9 @@ async def replace_old_question(message: Message, next_question_index: int, previ
     question, keyboard = get_question_content(next_question_index)
     return await message.bot.edit_message_text(question, message.chat.id, previous_message_id, reply_markup=keyboard)
 
+
+async def del_previous_msg(msg_ids, message):
+    for msg_id in msg_ids:
+        await asyncio.sleep(0.33)
+        with suppress(TelegramBadRequest):
+            await message.bot.delete_message(message.chat.id, int(msg_id))

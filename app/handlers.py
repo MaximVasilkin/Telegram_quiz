@@ -2,15 +2,15 @@ import asyncio
 import logging
 import random
 from aiogram import html, Router, Bot, F
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ErrorEvent, User, CallbackQuery, FSInputFile
 from keyboards import get_start_button, get_url_button
 from quiz import KINESTHETIC, VISUAL, AUDIAL, QUIZ_LEN, PSYCHOTYPES
 from states import QuizStates
-from utils import collect_answer, replace_old_question
+from utils import collect_answer, replace_old_question, del_previous_msg
 import redis.asyncio as async_redis
+
 
 router = Router()
 logger = logging.getLogger()
@@ -30,10 +30,7 @@ async def command_start_handler(message: Message, state: FSMContext, bot: Bot) -
     previous_message_id = user_data.get('previous_message_id')
 
     if previous_message_id is not None:
-        try:
-            await bot.delete_message(message.chat.id, previous_message_id)
-        except TelegramBadRequest:
-            pass
+        await del_previous_msg(str(previous_message_id).split(' '), message)
 
     scores = {KINESTHETIC: 0, VISUAL: 0, AUDIAL: 0}
     await state.set_data({'scores': scores})
@@ -66,7 +63,9 @@ async def start_quiz(callback: CallbackQuery,
 async def answering(callback: CallbackQuery,
                     state: FSMContext,
                     bot: Bot,
+                    event_from_user: User,
                     redis_client: async_redis.Redis) -> None:
+
     answer = callback.data
     await collect_answer(answer, state)
 
@@ -91,12 +90,15 @@ async def answering(callback: CallbackQuery,
         psychotype_garden = users_psychotype['garden']
         psychotype_description = users_psychotype['description']
 
-        link = 'https://school.garden-group.online/psychology_landscape'
-        p_s_ = html.italic(('Как создать идеальный сад не только для себя, но и для клиента, '
-                            f'мы расскажем на нашем {html.underline(html.bold(html.link("вебинаре", link)))}, '
-                            f'посвященном психологии в ландшафтном дизайне 4 июня.\n'
-                            f'Если вы еще не успели, '
-                            f'{html.underline(html.bold(html.link("регистрируйтесь на вебинар «Психология в ландшафтном дизайне»", link)))}\n\n'
+        link = 'https://school.garden-group.online/marathon_landesign'
+
+        p_s_ = html.italic((f'{html.bold(html.quote(event_from_user.first_name))}, '
+                            f'станьте профессионалом в области ландшафтного дизайна на нашем двухдневном марафоне '
+                            f'“Как начать карьеру в ландшафтном дизайне 2024 году”.\n'
+                            f'{html.bold("Ландшафтный дизайн - это профессия будущего.")} '
+                            f'Спрос на квалифицированных специалистов растёт с каждым днём.\n\n'
+                            f'{html.underline(html.bold(html.link("Зарегистрируйся на наш марафон", link)))} '
+                            f'{html.bold("сегодня")} и сделай первый шаг к своей мечте!\n\n'
                             'С любовью, \n'
                             f'{html.bold("Garden Group")}🍀'))
 
@@ -104,11 +106,9 @@ async def answering(callback: CallbackQuery,
                   f'{psychotype_description}\n\n'
                   f'{html.underline("Результаты:")} \n\n'
                   f'{scored_psychotypes}\n\n'
-                  f'Пройти заново: /start\n\n'
-                  f'{p_s_}')
+                  f'Пройти заново: /start')
 
-        await bot.delete_message(callback.message.chat.id, previous_message_id)
-        await asyncio.sleep(0.33)
+        await del_previous_msg(str(previous_message_id).split(' '), callback.message)
 
         cached_photo_id = await redis_client.get(users_psychotype_eng)
 
@@ -124,13 +124,18 @@ async def answering(callback: CallbackQuery,
             widest_photo_id = max(sent_message.photo, key=lambda f: f.width).file_id
             await redis_client.set(users_psychotype_eng, widest_photo_id)
         else:
-            url_button = get_url_button('Зарегистрироваться', link)
+
             sent_message = await bot.send_photo(chat_id=chat_id,
                                                 photo=cached_photo_id,
-                                                caption=result,
-                                                reply_markup=url_button)
+                                                caption=result)
 
-        await state.update_data(previous_message_id=sent_message.message_id)
+        url_button = get_url_button('Зарегистрироваться', link)
+
+        await asyncio.sleep(1)
+        sent_ps = await callback.message.answer(p_s_, reply_markup=url_button)
+
+        await state.update_data(previous_message_id=f'{sent_message.message_id} {sent_ps.message_id}')
+
         await state.set_state(state=None)
         return
 
