@@ -1,12 +1,11 @@
 import asyncio
 from contextlib import suppress
-
 from aiogram import html, types
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from quiz import get_question_by_position, QUIZ_LEN
+from .quiz import get_question_by_position, QUIZ_LEN
 
 
 NUMS_EMOJI = dict(zip(tuple(range(10)), ('0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣')))

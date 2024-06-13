@@ -2,6 +2,7 @@ version: '3.9'
 
 volumes:
   redis_data:
+  pgdata:
 
 networks:
   backend:
@@ -13,15 +14,15 @@ services:
     container_name: telegram_garden_quiz_bot
     depends_on:
       - redis
+      - postgresql
     env_file:
       - .env
     volumes:
-      - ./app/errors.txt:/home/myuser/app/errors.txt:rw
+      - ./app/logs/tg_bot_log.txt:/home/myuser/app/logs/tg_bot_log.txt:rw
     user: myuser
     restart: always
     networks:
       - backend
-
 
   redis:
     image: redis:7-alpine
@@ -31,4 +32,24 @@ services:
     networks:
       - backend
     restart: always
+
+  postgresql:
+    image: postgres:12-alpine
+    container_name: postgres_garden_quiz_bot
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./app/logs/pg_log.txt:/var/log/postgresql:rw
+    healthcheck:
+      test: [ 'CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB' ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 3s
+    restart: always
+    networks:
+      - backend
 

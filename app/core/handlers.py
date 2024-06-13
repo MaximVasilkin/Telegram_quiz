@@ -5,11 +5,14 @@ from aiogram import html, Router, Bot, F
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ErrorEvent, User, CallbackQuery, FSInputFile
-from keyboards import get_start_button, get_url_button
-from quiz import KINESTHETIC, VISUAL, AUDIAL, QUIZ_LEN, PSYCHOTYPES
-from states import QuizStates
-from utils import collect_answer, replace_old_question, del_previous_msg
-import redis.asyncio as async_redis
+from aiogram.enums.chat_action import ChatAction
+from db.enums import ActionType
+from db.utils import AsyncDataBase
+from .redis_db import RedisDataBaseClient
+from .keyboards import get_start_button, get_url_button
+from .quiz import KINESTHETIC, VISUAL, AUDIAL, QUIZ_LEN, PSYCHOTYPES
+from .states import QuizStates
+from .utils import collect_answer, replace_old_question, del_previous_msg
 
 
 router = Router()
@@ -25,7 +28,7 @@ async def error_handler(event: ErrorEvent, bot: Bot, event_from_user: User):
 
 
 @router.message(CommandStart())
-async def command_start_handler(message: Message, state: FSMContext, bot: Bot) -> None:
+async def command_start_handler(message: Message, state: FSMContext) -> None:
     user_data = await state.get_data()
     previous_message_id = user_data.get('previous_message_id')
 
@@ -51,6 +54,7 @@ async def command_start_handler(message: Message, state: FSMContext, bot: Bot) -
 @router.callback_query(F.data == 'start', StateFilter(QuizStates.quiz_in_progress))
 async def start_quiz(callback: CallbackQuery,
                      state: FSMContext) -> None:
+
     user_data = await state.get_data()
     previous_message_id = user_data.get('previous_message_id')
     await replace_old_question(callback.message, 0, previous_message_id)
@@ -61,7 +65,8 @@ async def answering(callback: CallbackQuery,
                     state: FSMContext,
                     bot: Bot,
                     event_from_user: User,
-                    redis_client: async_redis.Redis) -> None:
+                    redis_client: RedisDataBaseClient,
+                    async_db: AsyncDataBase) -> None:
 
     answer = callback.data
     await collect_answer(answer, state)
@@ -107,7 +112,7 @@ async def answering(callback: CallbackQuery,
 
         await del_previous_msg(str(previous_message_id).split(' '), callback.message)
 
-        cached_photo_id = await redis_client.get(users_psychotype_eng)
+        cached_photo_id = await redis_client.get_picture_id(users_psychotype_eng)
 
         if cached_photo_id is None:
             # Отправка файла из файловой системы
@@ -119,12 +124,13 @@ async def answering(callback: CallbackQuery,
                                                 caption=result)
 
             widest_photo_id = max(sent_message.photo, key=lambda f: f.width).file_id
-            await redis_client.set(users_psychotype_eng, widest_photo_id)
+            await redis_client.set_picture_id(users_psychotype_eng, widest_photo_id)
         else:
-
             sent_message = await bot.send_photo(chat_id=chat_id,
                                                 photo=cached_photo_id,
                                                 caption=result)
+
+        await async_db.create_action(event_from_user.id, ActionType.test_finished.value)
 
         url_button = get_url_button('Зарегистрироваться', link)
 
