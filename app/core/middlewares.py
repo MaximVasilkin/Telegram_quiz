@@ -1,10 +1,8 @@
-import logging
 from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.dispatcher.flags import get_flag
 from aiogram.types import TelegramObject, Message, User
 from aiogram.utils.chat_action import ChatActionSender
-
 from .redis_db import RedisDataBaseClient
 from db.utils import AsyncDataBase
 
@@ -75,10 +73,9 @@ class CheckAndUpdateUsernameMiddleware(BaseMiddleware):
         user: User = data['event_from_user']
         user_id = user.id
         actual_username = user.username
-        saved_username = await self.redis_client.get_username(user_id)
+        is_username_updated = await self.redis_client.update_user_name_if_changed(user_id, actual_username)
 
-        if actual_username != saved_username:
-            await self.redis_client.set_username(user_id, actual_username)
+        if is_username_updated:
             await self.async_db.update_tg_username(user_id, actual_username)
 
         return await handler(event, data)
@@ -107,3 +104,4 @@ class ChatActionMiddleware(BaseMiddleware):
                                     bot=data['bot']):
 
             return await handler(event, data)
+

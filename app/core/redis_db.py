@@ -17,6 +17,7 @@ class RedisDataBaseClient:
         return f'{self.throttle_key}_{tg_id}'
 
     async def set_username(self, tg_id: int, username: str):
+        username = username or ''
         await self.redis_client.hset(self.get_user_key(tg_id), self.username_key, username)
 
     async def get_username(self, tg_id: int) -> str:
@@ -43,6 +44,15 @@ class RedisDataBaseClient:
     async def set_username_if_invalid(self, tg_id: int, current_username: str) -> bool:
         username = await self.get_username(tg_id)
         need_update = username is None or username != current_username
+        if need_update:
+            await self.set_username(tg_id, current_username)
+        # был ли изменён username. True/False
+        return need_update
+
+    async def update_user_name_if_changed(self, tg_id: int, current_username: str) -> bool:
+        current_username = current_username or ''
+        saved_username = await self.get_username(tg_id)
+        need_update = saved_username != current_username
         if need_update:
             await self.set_username(tg_id, current_username)
         # был ли изменён username. True/False
