@@ -5,12 +5,11 @@ from aiogram import html, Router, Bot, F
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ErrorEvent, User, CallbackQuery, FSInputFile
-from aiogram.enums.chat_action import ChatAction
 from db.enums import ActionType
 from db.utils import AsyncDataBase
 from .redis_db import RedisDataBaseClient
 from .keyboards import get_start_button, get_url_button
-from .quiz import KINESTHETIC, VISUAL, AUDIAL, QUIZ_LEN, PSYCHOTYPES
+from .quiz import KINESTHETIC, VISUAL, AUDIAL, QUIZ_LEN, PSYCHOTYPES, PSYCHOTYPES_NAMES
 from .states import QuizStates
 from .utils import collect_answer, replace_old_question, del_previous_msg
 
@@ -60,7 +59,7 @@ async def start_quiz(callback: CallbackQuery,
     await replace_old_question(callback.message, 0, previous_message_id)
 
 
-@router.callback_query(F.data, StateFilter(QuizStates.quiz_in_progress))
+@router.callback_query(F.data.in_(PSYCHOTYPES_NAMES), StateFilter(QuizStates.quiz_in_progress))
 async def answering(callback: CallbackQuery,
                     state: FSMContext,
                     bot: Bot,
@@ -146,9 +145,10 @@ async def answering(callback: CallbackQuery,
     await state.update_data(current_question_position=next_question_index)
 
 
-@router.callback_query()
-async def on_restart(callback: CallbackQuery, bot: Bot):
+@router.callback_query(F.data == 'start', StateFilter(None))
+@router.callback_query(F.data.in_(PSYCHOTYPES_NAMES), StateFilter(None))
+async def on_restart(callback: CallbackQuery):
     message = callback.message
-    await bot.delete_message(message.chat.id, message.message_id)
+    await del_previous_msg([message.message_id], message)
     await asyncio.sleep(0.33)
     await message.answer('Ой! Что-то пошло не так! Начните заново /start')

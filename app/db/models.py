@@ -27,6 +27,14 @@ class UserModel(Base):
     actions: Mapped[List['ActionModel']] = relationship(back_populates='user',
                                                         cascade='all, delete-orphan')
 
+    def as_dict(self):
+        return {'id': self.id,
+                'telegram_id': self.telegram_id,
+                'user_name': self.user_name,
+                'first_name': self.first_name,
+                'last_name': self.last_name,
+                'joined_at': str(self.joined_at)}
+
 
 class ActionModel(Base):
     __tablename__ = 'actions'

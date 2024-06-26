@@ -8,6 +8,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.utils.callback_answer import CallbackAnswerMiddleware
 from db.utils import AsyncDataBase
 from core.handlers import router
+from core.admin_handlers import admin_router
 from core.redis_db import RedisDataBaseClient
 from core.middlewares import AddUserToDataBasesMiddleware, \
                              CheckAndUpdateUsernameMiddleware, \
@@ -42,15 +43,17 @@ async def start_bot() -> None:
     dp = Dispatcher(events_isolation=SimpleEventIsolation(),
                     storage=redis_fsm,
                     redis_client=redis_cache_client,
-                    async_db=async_db)
+                    async_db=async_db,
+                    system_temp_data={})
 
     dp.update.outer_middleware(AddUserToDataBasesMiddleware(redis_cache_client, async_db))
     dp.update.outer_middleware(CheckAndUpdateUsernameMiddleware(redis_cache_client, async_db))
     dp.message.middleware(ThrottlingMessagesMiddleware(redis_cache_client))
     dp.callback_query.middleware(CallbackAnswerMiddleware())
-    # dp.callback_query.middleware(ChatActionMiddleware())
+    dp.callback_query.middleware(ChatActionMiddleware())
+    dp.message.middleware(ChatActionMiddleware())
 
-    dp.include_routers(router)
+    dp.include_routers(router, admin_router)
 
     try:
         await dp.start_polling(bot)

@@ -1,10 +1,12 @@
+import asyncio
 from typing import Callable, Dict, Any, Awaitable
-from aiogram import BaseMiddleware
+from aiogram import BaseMiddleware, Bot
 from aiogram.dispatcher.flags import get_flag
 from aiogram.types import TelegramObject, Message, User
 from aiogram.utils.chat_action import ChatActionSender
 from .redis_db import RedisDataBaseClient
 from db.utils import AsyncDataBase
+from .utils import get_admins
 
 
 class ThrottlingMessagesMiddleware(BaseMiddleware):
@@ -104,4 +106,60 @@ class ChatActionMiddleware(BaseMiddleware):
                                     bot=data['bot']):
 
             return await handler(event, data)
+
+
+class OnlyForAdminMiddleware(BaseMiddleware):
+
+    @property
+    def admins(self):
+        return get_admins()
+
+    async def __call__(self,
+                       handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
+                       event: TelegramObject,
+                       data: Dict[str, Any]) -> Any:
+
+        # выполняем, если от админа
+        if data['event_from_user'].id in self.admins:
+            return await handler(event, data)
+
+
+class OnePersonOperationMiddleware(BaseMiddleware):
+
+    """
+    Middleware для блокировки кокурентного выполнения хендлера.
+    """
+    def __init__(self, wait_for_result=False, check_period=1):
+        self.wait_for_result = wait_for_result
+        self.check_period = check_period
+
+    async def __call__(self,
+                       handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
+                       event: TelegramObject,
+                       data: Dict[str, Any]) -> Any:
+
+        is_one_person_operation = get_flag(data, 'one_person_operation')
+
+        if is_one_person_operation:
+            system_temp_data: dict = data['system_temp_data']
+            is_pending = system_temp_data.get('pending')
+            if is_pending:
+                bot: Bot = data['bot']
+                event_from_user: User = data['event_from_user']
+                await bot.send_message(event_from_user.id, 'На данный момент бот уже занят выгрузкой данных.\n'
+                                                           'Пожалуйста, повторите попытку позже.')
+                if not self.wait_for_result:
+                    return
+
+            while system_temp_data.get('pending'):
+                await asyncio.sleep(self.check_period)
+
+            system_temp_data['pending'] = True
+            try:
+                result = await handler(event, data)
+            finally:
+                system_temp_data['pending'] = False
+            return result
+
+        return await handler(event, data)
 
